@@ -1,16 +1,19 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package casbin
 
@@ -18,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/casbin/v3/util"
 )
 
 func rawEnforce(sub string, obj string, act string) bool {
@@ -38,7 +41,7 @@ func BenchmarkRaw(b *testing.B) {
 }
 
 func BenchmarkBasicModel(b *testing.B) {
-	e, _ := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv", false)
+	e, _ := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -47,7 +50,7 @@ func BenchmarkBasicModel(b *testing.B) {
 }
 
 func BenchmarkRBACModel(b *testing.B) {
-	e, _ := NewEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv", false)
+	e, _ := NewEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -69,7 +72,7 @@ func BenchmarkRBACModelSizes(b *testing.B) {
 	for _, c := range cases {
 		c := c
 
-		e, err := NewEnforcer("examples/rbac_model.conf", false)
+		e, err := NewEnforcer("examples/rbac_model.conf")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -125,7 +128,7 @@ func BenchmarkRBACModelSizes(b *testing.B) {
 }
 
 func BenchmarkRBACModelSmall(b *testing.B) {
-	e, _ := NewEnforcer("examples/rbac_model.conf", false)
+	e, _ := NewEnforcer("examples/rbac_model.conf")
 
 	// 100 roles, 10 resources.
 	for i := 0; i < 100; i++ {
@@ -150,7 +153,7 @@ func BenchmarkRBACModelSmall(b *testing.B) {
 }
 
 func BenchmarkRBACModelMedium(b *testing.B) {
-	e, _ := NewEnforcer("examples/rbac_model.conf", false)
+	e, _ := NewEnforcer("examples/rbac_model.conf")
 
 	// 1000 roles, 100 resources.
 	pPolicies := make([][]string, 0)
@@ -181,7 +184,7 @@ func BenchmarkRBACModelMedium(b *testing.B) {
 }
 
 func BenchmarkRBACModelLarge(b *testing.B) {
-	e, _ := NewEnforcer("examples/rbac_model.conf", false)
+	e, _ := NewEnforcer("examples/rbac_model.conf")
 
 	// 10000 roles, 1000 resources.
 	pPolicies := make([][]string, 0)
@@ -212,7 +215,7 @@ func BenchmarkRBACModelLarge(b *testing.B) {
 }
 
 func BenchmarkRBACModelWithResourceRoles(b *testing.B) {
-	e, _ := NewEnforcer("examples/rbac_with_resource_roles_model.conf", "examples/rbac_with_resource_roles_policy.csv", false)
+	e, _ := NewEnforcer("examples/rbac_with_resource_roles_model.conf", "examples/rbac_with_resource_roles_policy.csv")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -221,7 +224,7 @@ func BenchmarkRBACModelWithResourceRoles(b *testing.B) {
 }
 
 func BenchmarkRBACModelWithDomains(b *testing.B) {
-	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv", false)
+	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -230,7 +233,7 @@ func BenchmarkRBACModelWithDomains(b *testing.B) {
 }
 
 func BenchmarkABACModel(b *testing.B) {
-	e, _ := NewEnforcer("examples/abac_model.conf", false)
+	e, _ := NewEnforcer("examples/abac_model.conf")
 	data1 := newTestResource("data1", "alice")
 
 	b.ResetTimer()
@@ -239,8 +242,22 @@ func BenchmarkABACModel(b *testing.B) {
 	}
 }
 
+func BenchmarkABACRuleModel(b *testing.B) {
+	e, _ := NewEnforcer("examples/abac_rule_model.conf")
+	sub := newTestSubject("alice", 18)
+
+	for i := 0; i < 1000; i++ {
+		_, _ = e.AddPolicy("r.sub.Age > 20", fmt.Sprintf("data%d", i), "read")
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = e.Enforce(sub, "data100", "read")
+	}
+}
+
 func BenchmarkKeyMatchModel(b *testing.B) {
-	e, _ := NewEnforcer("examples/keymatch_model.conf", "examples/keymatch_policy.csv", false)
+	e, _ := NewEnforcer("examples/keymatch_model.conf", "examples/keymatch_policy.csv")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

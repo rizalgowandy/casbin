@@ -1,16 +1,19 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package casbin
 
@@ -18,10 +21,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/casbin/v3/util"
 )
 
-// testGetUsersInDomain: Add by Gordon
+// testGetUsersInDomain: Add by Gordon.
 func testGetUsersInDomain(t *testing.T, e *Enforcer, name string, domain string, res []string) {
 	t.Helper()
 	myRes := e.GetUsersForRoleInDomain(name, domain)
@@ -52,7 +55,7 @@ func TestGetImplicitRolesForDomainUser(t *testing.T) {
 	testGetImplicitRolesInDomain(t, e, "alice", "domain1", []string{"role:global_admin", "role:reader", "role:writer"})
 }
 
-// TestUserAPIWithDomains: Add by Gordon
+// TestUserAPIWithDomains: Add by Gordon.
 func TestUserAPIWithDomains(t *testing.T) {
 	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
 
@@ -164,7 +167,6 @@ func TestRoleAPIWithDomains(t *testing.T) {
 
 	testGetRoles(t, e, []string{}, "non_exist", "domain2")
 	testGetRolesInDomain(t, e, "non_exist", "domain2", []string{})
-
 }
 
 func testGetPermissionsInDomain(t *testing.T, e *Enforcer, name string, domain string, res [][]string) {
@@ -198,7 +200,7 @@ func testGetDomainsForUser(t *testing.T, e *Enforcer, res []string, user string)
 	sort.Strings(myRes)
 	sort.Strings(res)
 
-	if !util.ArrayEquals(res, myRes) {
+	if !util.SetEquals(res, myRes) {
 		t.Error("domains for user: ", user, ": ", myRes, ",  supposed to be ", res)
 	}
 }
@@ -212,8 +214,9 @@ func TestGetDomainsForUser(t *testing.T) {
 }
 
 func testGetAllUsersByDomain(t *testing.T, e *Enforcer, domain string, expected []string) {
-	if !util.ArrayEquals(e.GetAllUsersByDomain(domain), expected) {
-		t.Errorf("users in %s: %v, supposed to be %v\n", domain, e.GetAllUsersByDomain(domain), expected)
+	users, _ := e.GetAllUsersByDomain(domain)
+	if !util.SetEquals(users, expected) {
+		t.Errorf("users in %s: %v, supposed to be %v\n", domain, users, expected)
 	}
 }
 
@@ -228,11 +231,20 @@ func testDeleteAllUsersByDomain(t *testing.T, domain string, expectedPolicy, exp
 	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
 
 	_, _ = e.DeleteAllUsersByDomain(domain)
-	if !util.Array2DEquals(e.GetPolicy(), expectedPolicy) {
-		t.Errorf("policy in %s: %v, supposed to be %v\n", domain, e.GetPolicy(), expectedPolicy)
+	policy, err := e.GetPolicy()
+	if err != nil {
+		t.Error(err)
 	}
-	if !util.Array2DEquals(e.GetGroupingPolicy(), expectedGroupingPolicy) {
-		t.Errorf("grouping policy in %s: %v, supposed to be %v\n", domain, e.GetGroupingPolicy(), expectedGroupingPolicy)
+	if !util.Array2DEquals(policy, expectedPolicy) {
+		t.Errorf("policy in %s: %v, supposed to be %v\n", domain, policy, expectedPolicy)
+	}
+
+	policies, err := e.GetGroupingPolicy()
+	if err != nil {
+		t.Error(err)
+	}
+	if !util.Array2DEquals(policies, expectedGroupingPolicy) {
+		t.Errorf("grouping policy in %s: %v, supposed to be %v\n", domain, policies, expectedGroupingPolicy)
 	}
 }
 
@@ -248,5 +260,169 @@ func TestDeleteAllUsersByDomain(t *testing.T) {
 		{"admin", "domain1", "data1", "write"},
 	}, [][]string{
 		{"alice", "admin", "domain1"},
+	})
+}
+
+// testGetAllDomains tests GetAllDomains().
+func testGetAllDomains(t *testing.T, e *Enforcer, res []string) {
+	t.Helper()
+	myRes, _ := e.GetAllDomains()
+	sort.Strings(myRes)
+	sort.Strings(res)
+	if !util.ArrayEquals(res, myRes) {
+		t.Error("domains: ", myRes, ", supposed to be ", res)
+	}
+}
+
+func TestGetAllDomains(t *testing.T) {
+	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
+
+	testGetAllDomains(t, e, []string{"domain1", "domain2"})
+}
+
+func testGetAllRolesByDomain(t *testing.T, e *Enforcer, domain string, expected []string) {
+	roles, _ := e.GetAllRolesByDomain(domain)
+	if !util.SetEquals(roles, expected) {
+		t.Errorf("roles in %s: %v, supposed to be %v\n", domain, roles, expected)
+	}
+}
+
+func TestGetAllRolesByDomain(t *testing.T) {
+	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
+
+	testGetAllRolesByDomain(t, e, "domain1", []string{"admin"})
+	testGetAllRolesByDomain(t, e, "domain2", []string{"admin"})
+
+	e, _ = NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy2.csv")
+
+	testGetAllRolesByDomain(t, e, "domain1", []string{"admin"})
+	testGetAllRolesByDomain(t, e, "domain2", []string{"admin"})
+	testGetAllRolesByDomain(t, e, "domain3", []string{"user"})
+}
+
+func testDeleteDomains(t *testing.T, domains []string, expectedPolicy, expectedGroupingPolicy [][]string, expectedDomains []string) {
+	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
+
+	_, _ = e.DeleteDomains(domains...)
+	policy, err := e.GetPolicy()
+	if err != nil {
+		t.Error(err)
+	}
+	if !util.Array2DEquals(policy, expectedPolicy) {
+		t.Errorf("policy after deleting domains %v: %v, supposed to be %v\n", domains, policy, expectedPolicy)
+	}
+
+	policies, err := e.GetGroupingPolicy()
+	if err != nil {
+		t.Error(err)
+	}
+	if !util.Array2DEquals(policies, expectedGroupingPolicy) {
+		t.Errorf("grouping policy after deleting domains %v: %v, supposed to be %v\n", domains, policies, expectedGroupingPolicy)
+	}
+
+	domainsAfterRemoval, _ := e.GetAllDomains()
+	if !util.SetEquals(domainsAfterRemoval, expectedDomains) {
+		t.Errorf("domains after deleting %v: %v, supposed to be %v\n", domains, domainsAfterRemoval, expectedDomains)
+	}
+}
+
+func TestDeleteDomains(t *testing.T) {
+	testDeleteDomains(t, []string{"domain1"}, [][]string{
+		{"admin", "domain2", "data2", "read"},
+		{"admin", "domain2", "data2", "write"},
+	}, [][]string{
+		{"bob", "admin", "domain2"},
+	}, []string{"domain2"})
+
+	testDeleteDomains(t, []string{"domain2"}, [][]string{
+		{"admin", "domain1", "data1", "read"},
+		{"admin", "domain1", "data1", "write"},
+	}, [][]string{
+		{"alice", "admin", "domain1"},
+	}, []string{"domain1"})
+
+	testDeleteDomains(t, []string{}, [][]string{}, [][]string{}, []string{})
+}
+
+// TestGetRolesForUserInDomainWithConditionalFunctions.
+func TestGetRolesForUserInDomainWithConditionalFunctions(t *testing.T) {
+	modelText := "examples/rbac_with_domains_conditional_model.conf"
+	policyText := "examples/rbac_with_domains_conditional_policy.csv"
+
+	e, err := NewEnforcer(modelText, policyText)
+	if err != nil {
+		t.Fatalf("Failed to create enforcer: %v", err)
+	}
+
+	// Test without conditional functions
+	t.Run("WithoutConditionalFunctions", func(t *testing.T) {
+		roles := e.GetRolesForUserInDomain("alice", "domain1")
+		expected := []string{"test1"}
+		if !util.SetEquals(roles, expected) {
+			t.Errorf("Expected roles %v, got %v", expected, roles)
+		}
+	})
+
+	t.Run("WithConditionalFunctions", func(t *testing.T) {
+		e2, err := NewEnforcer(modelText, policyText)
+		if err != nil {
+			t.Fatalf("Failed to create enforcer: %v", err)
+		}
+
+		// Add time-based conditional functions
+		g, err := e2.GetNamedGroupingPolicy("g")
+		if err != nil {
+			t.Fatalf("Failed to get grouping policy: %v", err)
+		}
+		for _, gp := range g {
+			if len(gp) >= 4 {
+				e2.AddNamedDomainLinkConditionFunc("g", gp[0], gp[1], gp[2], util.TimeMatchFunc)
+				e2.SetNamedDomainLinkConditionFuncParams("g", gp[0], gp[1], gp[2], "_", gp[4])
+			}
+		}
+
+		roles := e2.GetRolesForUserInDomain("alice", "domain1")
+		if roles == nil {
+			t.Error("GetRolesForUserInDomain should not return nil, even with conditional functions")
+		}
+
+		roles = e2.GetRolesForUserInDomain("bob", "domain2")
+		if roles == nil {
+			t.Error("GetRolesForUserInDomain should not return nil for bob, even with conditional functions")
+		}
+	})
+
+	t.Run("WithAlwaysTrueCondition", func(t *testing.T) {
+		e3, err := NewEnforcer(modelText, policyText)
+		if err != nil {
+			t.Fatalf("Failed to create enforcer: %v", err)
+		}
+
+		// Use always-true condition function
+		alwaysTrueFunc := func(params ...string) (bool, error) {
+			return true, nil
+		}
+
+		g, err := e3.GetNamedGroupingPolicy("g")
+		if err != nil {
+			t.Fatalf("Failed to get grouping policy: %v", err)
+		}
+		for _, gp := range g {
+			if len(gp) >= 4 {
+				e3.AddNamedDomainLinkConditionFunc("g", gp[0], gp[1], gp[2], alwaysTrueFunc)
+			}
+		}
+
+		roles := e3.GetRolesForUserInDomain("alice", "domain1")
+		expected := []string{"test1"}
+		if !util.SetEquals(roles, expected) {
+			t.Errorf("Expected roles %v, got %v", expected, roles)
+		}
+
+		roles = e3.GetRolesForUserInDomain("bob", "domain2")
+		expected = []string{"qa1"}
+		if !util.SetEquals(roles, expected) {
+			t.Errorf("Expected roles %v, got %v", expected, roles)
+		}
 	})
 }

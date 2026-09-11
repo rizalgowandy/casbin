@@ -1,28 +1,35 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package casbin
 
 import (
 	"testing"
 
-	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/casbin/v3/util"
 )
 
-func testStringList(t *testing.T, title string, f func() []string, res []string) {
+func testStringList(t *testing.T, title string, f func() ([]string, error), res []string) {
 	t.Helper()
-	myRes := f()
+	myRes, err := f()
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log(title+": ", myRes)
 
 	if !util.ArrayEquals(res, myRes) {
@@ -37,21 +44,40 @@ func TestGetList(t *testing.T) {
 	testStringList(t, "Objects", e.GetAllObjects, []string{"data1", "data2"})
 	testStringList(t, "Actions", e.GetAllActions, []string{"read", "write"})
 	testStringList(t, "Roles", e.GetAllRoles, []string{"data2_admin"})
+	testStringList(t, "Users", e.GetAllUsers, []string{"alice", "bob"})
+}
+
+func TestGetListWithDomains(t *testing.T) {
+	e, _ := NewEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv")
+
+	testStringList(t, "Subjects", e.GetAllSubjects, []string{"admin"})
+	testStringList(t, "Objects", e.GetAllObjects, []string{"data1", "data2"})
+	testStringList(t, "Actions", e.GetAllActions, []string{"read", "write"})
+	testStringList(t, "Roles", e.GetAllRoles, []string{"admin"})
+	testStringList(t, "Users", e.GetAllUsers, []string{})
 }
 
 func testGetPolicy(t *testing.T, e *Enforcer, res [][]string) {
 	t.Helper()
-	myRes := e.GetPolicy()
+	myRes, err := e.GetPolicy()
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log("Policy: ", myRes)
 
-	if !util.Array2DEquals(res, myRes) {
+	if !util.SortedArray2DEquals(res, myRes) {
 		t.Error("Policy: ", myRes, ", supposed to be ", res)
 	}
 }
 
 func testGetFilteredPolicy(t *testing.T, e *Enforcer, fieldIndex int, res [][]string, fieldValues ...string) {
 	t.Helper()
-	myRes := e.GetFilteredPolicy(fieldIndex, fieldValues...)
+	myRes, err := e.GetFilteredPolicy(fieldIndex, fieldValues...)
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log("Policy for ", util.ParamsToString(fieldValues...), ": ", myRes)
 
 	if !util.Array2DEquals(res, myRes) {
@@ -59,9 +85,27 @@ func testGetFilteredPolicy(t *testing.T, e *Enforcer, fieldIndex int, res [][]st
 	}
 }
 
+func testGetFilteredNamedPolicyWithMatcher(t *testing.T, e *Enforcer, ptype string, matcher string, res [][]string) {
+	t.Helper()
+	myRes, err := e.GetFilteredNamedPolicyWithMatcher(ptype, matcher)
+	t.Log("Policy for", matcher, ": ", myRes)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !util.Array2DEquals(res, myRes) {
+		t.Error("Policy for ", matcher, ": ", myRes, ", supposed to be ", res)
+	}
+}
+
 func testGetGroupingPolicy(t *testing.T, e *Enforcer, res [][]string) {
 	t.Helper()
-	myRes := e.GetGroupingPolicy()
+	myRes, err := e.GetGroupingPolicy()
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log("Grouping policy: ", myRes)
 
 	if !util.Array2DEquals(res, myRes) {
@@ -71,7 +115,11 @@ func testGetGroupingPolicy(t *testing.T, e *Enforcer, res [][]string) {
 
 func testGetFilteredGroupingPolicy(t *testing.T, e *Enforcer, fieldIndex int, res [][]string, fieldValues ...string) {
 	t.Helper()
-	myRes := e.GetFilteredGroupingPolicy(fieldIndex, fieldValues...)
+	myRes, err := e.GetFilteredGroupingPolicy(fieldIndex, fieldValues...)
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log("Grouping policy for ", util.ParamsToString(fieldValues...), ": ", myRes)
 
 	if !util.Array2DEquals(res, myRes) {
@@ -81,7 +129,11 @@ func testGetFilteredGroupingPolicy(t *testing.T, e *Enforcer, fieldIndex int, re
 
 func testHasPolicy(t *testing.T, e *Enforcer, policy []string, res bool) {
 	t.Helper()
-	myRes := e.HasPolicy(policy)
+	myRes, err := e.HasPolicy(policy)
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log("Has policy ", util.ArrayToString(policy), ": ", myRes)
 
 	if res != myRes {
@@ -91,7 +143,11 @@ func testHasPolicy(t *testing.T, e *Enforcer, policy []string, res bool) {
 
 func testHasGroupingPolicy(t *testing.T, e *Enforcer, policy []string, res bool) {
 	t.Helper()
-	myRes := e.HasGroupingPolicy(policy)
+	myRes, err := e.HasGroupingPolicy(policy)
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Log("Has grouping policy ", util.ArrayToString(policy), ": ", myRes)
 
 	if res != myRes {
@@ -106,7 +162,8 @@ func TestGetPolicyAPI(t *testing.T) {
 		{"alice", "data1", "read"},
 		{"bob", "data2", "write"},
 		{"data2_admin", "data2", "read"},
-		{"data2_admin", "data2", "write"}})
+		{"data2_admin", "data2", "write"},
+	})
 
 	testGetFilteredPolicy(t, e, 0, [][]string{{"alice", "data1", "read"}}, "alice")
 	testGetFilteredPolicy(t, e, 0, [][]string{{"bob", "data2", "write"}}, "bob")
@@ -115,6 +172,14 @@ func TestGetPolicyAPI(t *testing.T) {
 	testGetFilteredPolicy(t, e, 1, [][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}}, "data2")
 	testGetFilteredPolicy(t, e, 2, [][]string{{"alice", "data1", "read"}, {"data2_admin", "data2", "read"}}, "read")
 	testGetFilteredPolicy(t, e, 2, [][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "write"}}, "write")
+
+	testGetFilteredNamedPolicyWithMatcher(t, e, "p", "'alice' == p.sub", [][]string{{"alice", "data1", "read"}})
+	testGetFilteredNamedPolicyWithMatcher(t, e, "p", "keyMatch2(p.sub, '*')", [][]string{
+		{"alice", "data1", "read"},
+		{"bob", "data2", "write"},
+		{"data2_admin", "data2", "read"},
+		{"data2_admin", "data2", "write"},
+	})
 
 	testGetFilteredPolicy(t, e, 0, [][]string{{"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}}, "data2_admin", "data2")
 	// Note: "" (empty string) in fieldValues means matching all values.
@@ -146,7 +211,8 @@ func TestModifyPolicyAPI(t *testing.T) {
 		{"alice", "data1", "read"},
 		{"bob", "data2", "write"},
 		{"data2_admin", "data2", "read"},
-		{"data2_admin", "data2", "write"}})
+		{"data2_admin", "data2", "write"},
+	})
 
 	_, _ = e.RemovePolicy("alice", "data1", "read")
 	_, _ = e.RemovePolicy("bob", "data2", "write")
@@ -175,7 +241,8 @@ func TestModifyPolicyAPI(t *testing.T) {
 		{"jack", "data4", "read"},
 		{"katy", "data4", "write"},
 		{"leyo", "data4", "read"},
-		{"ham", "data4", "write"}})
+		{"ham", "data4", "write"},
+	})
 
 	_, _ = e.RemovePolicies(rules)
 	_, _ = e.RemovePolicies(rules)
@@ -187,7 +254,8 @@ func TestModifyPolicyAPI(t *testing.T) {
 	testGetPolicy(t, e, [][]string{
 		{"data2_admin", "data2", "read"},
 		{"data2_admin", "data2", "write"},
-		{"eve", "data3", "read"}})
+		{"eve", "data3", "read"},
+	})
 
 	_, _ = e.RemoveFilteredPolicy(1, "data2")
 
@@ -205,6 +273,19 @@ func TestModifyPolicyAPI(t *testing.T) {
 	_, _ = e.UpdatePolicies([][]string{{"eve", "data3", "write"}, {"leyo", "data4", "read"}, {"katy", "data4", "write"}},
 		[][]string{{"eve", "data3", "read"}, {"leyo", "data4", "write"}, {"katy", "data1", "write"}})
 	testGetPolicy(t, e, [][]string{{"eve", "data3", "read"}, {"jack", "data4", "read"}, {"katy", "data1", "write"}, {"leyo", "data4", "write"}, {"ham", "data4", "write"}})
+
+	e.ClearPolicy()
+	_, _ = e.AddPoliciesEx([][]string{{"user1", "data1", "read"}, {"user1", "data1", "read"}})
+	testGetPolicy(t, e, [][]string{{"user1", "data1", "read"}})
+	// {"user1", "data1", "read"} repeated
+	_, _ = e.AddPoliciesEx([][]string{{"user1", "data1", "read"}, {"user2", "data2", "read"}})
+	testGetPolicy(t, e, [][]string{{"user1", "data1", "read"}, {"user2", "data2", "read"}})
+	// {"user1", "data1", "read"}, {"user2", "data2", "read"} repeated
+	_, _ = e.AddNamedPoliciesEx("p", [][]string{{"user1", "data1", "read"}, {"user2", "data2", "read"}, {"user3", "data3", "read"}})
+	testGetPolicy(t, e, [][]string{{"user1", "data1", "read"}, {"user2", "data2", "read"}, {"user3", "data3", "read"}})
+	// {"user1", "data1", "read"}, {"user2", "data2", "read"}, , {"user3", "data3", "read"} repeated
+	_, _ = e.SelfAddPoliciesEx("p", "p", [][]string{{"user1", "data1", "read"}, {"user2", "data2", "read"}, {"user3", "data3", "read"}, {"user4", "data4", "read"}})
+	testGetPolicy(t, e, [][]string{{"user1", "data1", "read"}, {"user2", "data2", "read"}, {"user3", "data3", "read"}, {"user4", "data4", "read"}})
 }
 
 func TestModifyGroupingPolicyAPI(t *testing.T) {
@@ -279,4 +360,13 @@ func TestModifyGroupingPolicyAPI(t *testing.T) {
 	testGetRoles(t, e, []string{"data5_admin"}, "admin")
 	testGetRoles(t, e, []string{"admin_groups"}, "eve")
 
+	e.ClearPolicy()
+	_, _ = e.AddGroupingPoliciesEx([][]string{{"user1", "member"}})
+	testGetUsers(t, e, []string{"user1"}, "member")
+	// {"user1", "member"} repeated
+	_, _ = e.AddGroupingPoliciesEx([][]string{{"user1", "member"}, {"user2", "member"}})
+	testGetUsers(t, e, []string{"user1", "user2"}, "member")
+	// {"user1", "member"}, {"user2", "member"} repeated
+	_, _ = e.AddNamedGroupingPoliciesEx("g", [][]string{{"user1", "member"}, {"user2", "member"}, {"user3", "member"}})
+	testGetUsers(t, e, []string{"user1", "user2", "user3"}, "member")
 }

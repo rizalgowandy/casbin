@@ -1,24 +1,30 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package defaultrolemanager
 
 import (
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 
-	"github.com/casbin/casbin/v2/rbac"
-	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/casbin/v3/rbac"
+	"github.com/casbin/casbin/v3/util"
 )
 
 func testRole(t *testing.T, rm rbac.RoleManager, name1 string, name2 string, res bool) {
@@ -46,7 +52,17 @@ func testPrintRoles(t *testing.T, rm rbac.RoleManager, name string, res []string
 	myRes, _ := rm.GetRoles(name)
 	t.Logf("%s: %s", name, myRes)
 
-	if !util.ArrayEquals(myRes, res) {
+	if !util.SetEquals(myRes, res) {
+		t.Errorf("%s: %s, supposed to be %s", name, myRes, res)
+	}
+}
+
+func testPrintUsers(t *testing.T, rm rbac.RoleManager, name string, res []string) {
+	t.Helper()
+	myRes, _ := rm.GetUsers(name)
+	t.Logf("%s: %s", name, myRes)
+
+	if !util.SetEquals(myRes, res) {
 		t.Errorf("%s: %s, supposed to be %s", name, myRes, res)
 	}
 }
@@ -55,7 +71,7 @@ func testPrintRolesWithDomain(t *testing.T, rm rbac.RoleManager, name string, do
 	t.Helper()
 	myRes, _ := rm.GetRoles(name, domain)
 
-	if !util.ArrayEquals(myRes, res) {
+	if !util.SetEquals(myRes, res) {
 		t.Errorf("%s: %s, supposed to be %s", name, myRes, res)
 	}
 }
@@ -127,6 +143,26 @@ func TestRole(t *testing.T) {
 	testPrintRoles(t, rm, "g1", []string{})
 	testPrintRoles(t, rm, "g2", []string{})
 	testPrintRoles(t, rm, "g3", []string{})
+
+	rm = NewRoleManager(3)
+	rm.AddMatchingFunc("keyMatch", util.KeyMatch)
+
+	_ = rm.AddLink("u1", "g1")
+	_ = rm.AddLink("u1", "*")
+	_ = rm.AddLink("u2", "g2")
+
+	// Current role inheritance tree after deleting the links:
+	//          g1   g2
+	//            \ /  \
+	//             *    u2
+	//             |
+	//             u1
+	testRole(t, rm, "u1", "g1", true)
+	testRole(t, rm, "u1", "g2", true)
+	testRole(t, rm, "u2", "g2", true)
+	testRole(t, rm, "u2", "g1", false)
+	testPrintRoles(t, rm, "u1", []string{"*", "u1", "u2", "g1", "g2"})
+	testPrintUsers(t, rm, "*", []string{"u1"})
 }
 
 func TestDomainRole(t *testing.T) {
@@ -281,16 +317,12 @@ func TestMatchingFuncOrder(t *testing.T) {
 
 	_ = rm.AddLink("g\\d+", "root")
 	_ = rm.AddLink("u1", "g1")
-	_ = rm.BuildRelationship("g\\d+", "root")
-	_ = rm.BuildRelationship("u1", "g1")
 	testRole(t, rm, "u1", "root", true)
 
 	_ = rm.Clear()
 
 	_ = rm.AddLink("u1", "g1")
 	_ = rm.AddLink("g\\d+", "root")
-	_ = rm.BuildRelationship("u1", "g1")
-	_ = rm.BuildRelationship("g\\d+", "root")
 	testRole(t, rm, "u1", "root", true)
 
 	_ = rm.Clear()
@@ -309,4 +341,96 @@ func TestDomainMatchingFuncWithDifferentDomain(t *testing.T) {
 
 	testDomainRole(t, rm, "alice", "admin", "domain1", true)
 	testDomainRole(t, rm, "alice", "admin", "domain2", false)
+}
+
+func TestTemporaryRoles(t *testing.T) {
+	rm := NewRoleManager(10)
+	rm.AddMatchingFunc("regexMatch", util.RegexMatch)
+
+	_ = rm.AddLink("u\\d+", "user")
+
+	for i := 0; i < 10; i++ {
+		testRole(t, rm, fmt.Sprintf("u%d", i), "user", true)
+	}
+
+	testPrintUsers(t, rm, "user", []string{"u\\d+"})
+	testPrintRoles(t, rm, "u1", []string{"user"})
+
+	_ = rm.AddLink("u1", "manager")
+
+	for i := 10; i < 20; i++ {
+		testRole(t, rm, fmt.Sprintf("u%d", i), "user", true)
+	}
+
+	testPrintUsers(t, rm, "user", []string{"u\\d+", "u1"})
+	testPrintRoles(t, rm, "u1", []string{"user", "manager"})
+}
+
+func TestMaxHierarchyLevel(t *testing.T) {
+	rm := NewRoleManager(1)
+	_ = rm.AddLink("level0", "level1")
+	_ = rm.AddLink("level1", "level2")
+	_ = rm.AddLink("level2", "level3")
+
+	testRole(t, rm, "level0", "level0", true)
+	testRole(t, rm, "level0", "level1", true)
+	testRole(t, rm, "level0", "level2", false)
+	testRole(t, rm, "level0", "level3", false)
+	testRole(t, rm, "level1", "level2", true)
+	testRole(t, rm, "level1", "level3", false)
+
+	rm = NewRoleManager(2)
+	_ = rm.AddLink("level0", "level1")
+	_ = rm.AddLink("level1", "level2")
+	_ = rm.AddLink("level2", "level3")
+
+	testRole(t, rm, "level0", "level0", true)
+	testRole(t, rm, "level0", "level1", true)
+	testRole(t, rm, "level0", "level2", true)
+	testRole(t, rm, "level0", "level3", false)
+	testRole(t, rm, "level1", "level2", true)
+	testRole(t, rm, "level1", "level3", true)
+}
+
+// TestConcurrentHasLink tests concurrent HasLink calls for race conditions.
+// This test verifies that concurrent HasLink calls with matching functions
+// don't produce inconsistent results due to temporary role creation/deletion races.
+// Regression test for issue #1318.
+func TestConcurrentHasLink(t *testing.T) {
+	rm := NewRoleManager(10)
+	rm.AddMatchingFunc("keyMatch2", util.KeyMatch2)
+
+	_ = rm.AddLink("alice", "admin")
+	_ = rm.AddLink("admin", "/data/*")
+
+	expected, _ := rm.HasLink("alice", "/data/123")
+
+	const numGoroutines = 20
+	const numIterations = 100
+
+	var inconsistencies int64
+	var wg sync.WaitGroup
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < numIterations; j++ {
+				result, err := rm.HasLink("alice", "/data/123")
+				if err != nil {
+					t.Errorf("HasLink failed: %v", err)
+					return
+				} else if result != expected {
+					atomic.AddInt64(&inconsistencies, 1)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if inconsistencies > 0 {
+		t.Errorf("Found %d inconsistencies in %d total operations",
+			inconsistencies, numGoroutines*numIterations)
+	}
 }

@@ -1,20 +1,23 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package casbin
 
-// GetUsersForRoleInDomain gets the users that has a role inside a domain. Add by Gordon
+// GetUsersForRoleInDomain gets the users that has a role inside a domain. Add by Gordon.
 func (e *SyncedEnforcer) GetUsersForRoleInDomain(name string, domain string) []string {
 	e.m.RLock()
 	defer e.m.RUnlock()
@@ -57,4 +60,12 @@ func (e *SyncedEnforcer) DeleteRolesForUserInDomain(user string, domain string) 
 	e.m.Lock()
 	defer e.m.Unlock()
 	return e.Enforcer.DeleteRolesForUserInDomain(user, domain)
+}
+
+// DeleteDomains deletes domains from the model.
+// Returns false if the domain does not exist (aka not affected).
+func (e *SyncedEnforcer) DeleteDomains(domains ...string) (bool, error) {
+	e.m.Lock()
+	defer e.m.Unlock()
+	return e.Enforcer.DeleteDomains(domains...)
 }

@@ -1,16 +1,19 @@
-// Copyright 2021 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package casbin
 
@@ -33,14 +36,14 @@ func TestCasbinJsGetPermissionForUserOld(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	target_str, _ := CasbinJsGetPermissionForUserOld(e, "alice")
-	t.Log("GetPermissionForUser Alice", string(target_str))
-	alice_target := make(map[string][]string)
-	err = json.Unmarshal(target_str, &alice_target)
+	targetStr, _ := CasbinJsGetPermissionForUserOld(e, "alice")
+	t.Log("GetPermissionForUser Alice", string(targetStr))
+	aliceTarget := make(map[string][]string)
+	err = json.Unmarshal(targetStr, &aliceTarget)
 	if err != nil {
 		t.Errorf("Test error: %s", err)
 	}
-	perm, ok := alice_target["read"]
+	perm, ok := aliceTarget["read"]
 	if !ok {
 		t.Errorf("Test error: Alice doesn't have read permission")
 	}
@@ -50,7 +53,7 @@ func TestCasbinJsGetPermissionForUserOld(t *testing.T) {
 	if !contains(perm, "data2") {
 		t.Errorf("Test error: Alice cannot read data2")
 	}
-	perm, ok = alice_target["write"]
+	perm, ok = aliceTarget["write"]
 	if !ok {
 		t.Errorf("Test error: Alice doesn't have write permission")
 	}
@@ -61,18 +64,18 @@ func TestCasbinJsGetPermissionForUserOld(t *testing.T) {
 		t.Errorf("Test error: Alice cannot write data2")
 	}
 
-	target_str, _ = CasbinJsGetPermissionForUserOld(e, "bob")
-	t.Log("GetPermissionForUser Bob", string(target_str))
-	bob_target := make(map[string][]string)
-	err = json.Unmarshal(target_str, &bob_target)
+	targetStr, _ = CasbinJsGetPermissionForUserOld(e, "bob")
+	t.Log("GetPermissionForUser Bob", string(targetStr))
+	bobTarget := make(map[string][]string)
+	err = json.Unmarshal(targetStr, &bobTarget)
 	if err != nil {
 		t.Errorf("Test error: %s", err)
 	}
-	_, ok = bob_target["read"]
+	_, ok = bobTarget["read"]
 	if ok {
 		t.Errorf("Test error: Bob has read permission")
 	}
-	perm, ok = bob_target["write"]
+	perm, ok = bobTarget["write"]
 	if !ok {
 		t.Errorf("Test error: Bob doesn't have permission")
 	}
@@ -86,7 +89,7 @@ func TestCasbinJsGetPermissionForUserOld(t *testing.T) {
 		t.Errorf("Test error: Bob can access a non-existing data")
 	}
 
-	_, ok = bob_target["rm_rf"]
+	_, ok = bobTarget["rm_rf"]
 	if ok {
 		t.Errorf("Someone can have a non-existing action (rm -rf)")
 	}

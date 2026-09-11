@@ -1,24 +1,30 @@
-// Copyright 2018 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package effector
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/casbin/casbin/v3/constant"
+)
 
 // DefaultEffector is default effector for Casbin.
-type DefaultEffector struct {
-}
+type DefaultEffector struct{}
 
 // NewDefaultEffector is the constructor for DefaultEffector.
 func NewDefaultEffector() *DefaultEffector {
@@ -32,7 +38,7 @@ func (e *DefaultEffector) MergeEffects(expr string, effects []Effect, matches []
 	explainIndex := -1
 
 	switch expr {
-	case "some(where (p_eft == allow))":
+	case constant.AllowOverrideEffect:
 		if matches[policyIndex] == 0 {
 			break
 		}
@@ -42,7 +48,7 @@ func (e *DefaultEffector) MergeEffects(expr string, effects []Effect, matches []
 			explainIndex = policyIndex
 			break
 		}
-	case "!some(where (p_eft == deny))":
+	case constant.DenyOverrideEffect:
 		// only check the current policyIndex
 		if matches[policyIndex] != 0 && effects[policyIndex] == Deny {
 			result = Deny
@@ -53,7 +59,7 @@ func (e *DefaultEffector) MergeEffects(expr string, effects []Effect, matches []
 		if policyIndex == policyLength-1 {
 			result = Allow
 		}
-	case "some(where (p_eft == allow)) && !some(where (p_eft == deny))":
+	case constant.AllowAndDenyEffect:
 		// short-circuit if matched deny rule
 		if matches[policyIndex] != 0 && effects[policyIndex] == Deny {
 			result = Deny
@@ -80,7 +86,7 @@ func (e *DefaultEffector) MergeEffects(expr string, effects []Effect, matches []
 				break
 			}
 		}
-	case "priority(p_eft) || deny", "subjectPriority(p_eft) || deny":
+	case constant.PriorityEffect, constant.SubjectPriorityEffect:
 		// reverse merge, short-circuit may be earlier
 		for i := len(effects) - 1; i >= 0; i-- {
 			if matches[i] == 0 {

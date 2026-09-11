@@ -1,24 +1,27 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package model
 
 import (
 	"sync"
 
-	"github.com/Knetic/govaluate"
-	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/casbin/v3/util"
+	"github.com/casbin/govaluate"
 )
 
 // FunctionMap represents the collection of Function.
@@ -43,6 +46,7 @@ func LoadFunctionMap() FunctionMap {
 	fm.AddFunction("keyMatch2", util.KeyMatch2Func)
 	fm.AddFunction("keyGet2", util.KeyGet2Func)
 	fm.AddFunction("keyMatch3", util.KeyMatch3Func)
+	fm.AddFunction("keyGet3", util.KeyGet3Func)
 	fm.AddFunction("keyMatch4", util.KeyMatch4Func)
 	fm.AddFunction("keyMatch5", util.KeyMatch5Func)
 	fm.AddFunction("regexMatch", util.RegexMatchFunc)
@@ -52,7 +56,7 @@ func LoadFunctionMap() FunctionMap {
 	return *fm
 }
 
-// GetFunctions return a map with all the functions
+// GetFunctions return a map with all the functions.
 func (fm *FunctionMap) GetFunctions() map[string]govaluate.ExpressionFunction {
 	ret := make(map[string]govaluate.ExpressionFunction)
 

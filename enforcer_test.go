@@ -1,26 +1,31 @@
-// Copyright 2017 The casbin Authors. All Rights Reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package casbin
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
-	"github.com/casbin/casbin/v2/model"
-	fileadapter "github.com/casbin/casbin/v2/persist/file-adapter"
-	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/casbin/v3/detector"
+	"github.com/casbin/casbin/v3/model"
+	fileadapter "github.com/casbin/casbin/v3/persist/file-adapter"
+	"github.com/casbin/casbin/v3/util"
 )
 
 func TestKeyMatchModelInMemory(t *testing.T) {
@@ -82,6 +87,11 @@ func TestKeyMatchModelInMemory(t *testing.T) {
 	testEnforce(t, e, "cathy", "/cathy_data", "DELETE", false)
 }
 
+func TestKeyMatchWithRBACInDomain(t *testing.T) {
+	e, _ := NewEnforcer("examples/keymatch_with_rbac_in_domain.conf", "examples/keymatch_with_rbac_in_domain.csv")
+	testDomainEnforce(t, e, "Username==test2", "engines/engine1", "*", "attach", true)
+}
+
 func TestKeyMatchModelInMemoryDeny(t *testing.T) {
 	m := model.NewModel()
 	m.AddDef("r", "r", "sub, obj, act")
@@ -138,8 +148,7 @@ func TestRBACModelInMemory(t *testing.T) {
 }
 
 func TestRBACModelInMemory2(t *testing.T) {
-	text :=
-		`
+	text := `
 [request_definition]
 r = sub, obj, act
 
@@ -270,21 +279,10 @@ func TestEnableEnforce(t *testing.T) {
 }
 
 func TestEnableLog(t *testing.T) {
-	e, _ := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv", true)
-	// The log is enabled by default, so the above is the same with:
-	// e := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv")
+	// This test is now a no-op since the logger has been removed
+	// Keeping it for backward compatibility, but it just tests enforcement
+	e, _ := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv")
 
-	testEnforce(t, e, "alice", "data1", "read", true)
-	testEnforce(t, e, "alice", "data1", "write", false)
-	testEnforce(t, e, "alice", "data2", "read", false)
-	testEnforce(t, e, "alice", "data2", "write", false)
-	testEnforce(t, e, "bob", "data1", "read", false)
-	testEnforce(t, e, "bob", "data1", "write", false)
-	testEnforce(t, e, "bob", "data2", "read", false)
-	testEnforce(t, e, "bob", "data2", "write", true)
-
-	// The log can also be enabled or disabled at run-time.
-	e.EnableLog(false)
 	testEnforce(t, e, "alice", "data1", "read", true)
 	testEnforce(t, e, "alice", "data1", "write", false)
 	testEnforce(t, e, "alice", "data2", "read", false)
@@ -432,6 +430,7 @@ func TestInitEmpty(t *testing.T) {
 
 	testEnforce(t, e, "alice", "/alice_data/resource1", "GET", true)
 }
+
 func testEnforceEx(t *testing.T, e *Enforcer, sub, obj, act interface{}, res []string) {
 	t.Helper()
 	_, myRes, _ := e.EnforceEx(sub, obj, act)
@@ -480,7 +479,9 @@ func TestEnforceEx(t *testing.T) {
 }
 
 func TestEnforceExLog(t *testing.T) {
-	e, _ := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv", true)
+	// This test was previously named for logging, but actually tests EnforceEx explain functionality
+	// Logger parameter has been removed, but the test still validates explain behavior
+	e, _ := NewEnforcer("examples/basic_model.conf", "examples/basic_policy.csv")
 
 	testEnforceEx(t, e, "alice", "data1", "read", []string{"alice", "data1", "read"})
 	testEnforceEx(t, e, "alice", "data1", "write", []string{})
@@ -528,6 +529,25 @@ func TestSubjectPriorityWithDomain(t *testing.T) {
 		{"bob", "data2", "domain2", "write"},
 	}, []bool{
 		true, true,
+	})
+}
+
+func TestSubjectPriorityInFilter(t *testing.T) {
+	e, _ := NewEnforcer()
+
+	adapter := fileadapter.NewFilteredAdapter("examples/subject_priority_policy_with_domain.csv")
+	_ = e.InitWithAdapter("examples/subject_priority_model_with_domain.conf", adapter)
+	if err := e.loadFilteredPolicy(&fileadapter.Filter{
+		P: []string{"", "", "domain1"},
+	}); err != nil {
+		t.Errorf("unexpected error in LoadFilteredPolicy: %v", err)
+	}
+
+	testBatchEnforce(t, e, [][]interface{}{
+		{"alice", "data1", "domain1", "write"},
+		{"admin", "data1", "domain1", "write"},
+	}, []bool{
+		true, false,
 	})
 }
 
@@ -604,4 +624,183 @@ func TestEvalPriority(t *testing.T) {
 	testEnforce(t, e, "admin", "users", "write", true)
 	testEnforce(t, e, "admin", "none", "write", false)
 	testEnforce(t, e, "user", "users", "write", false)
+}
+
+func TestLinkConditionFunc(t *testing.T) {
+	TrueFunc := func(args ...string) (bool, error) {
+		if len(args) != 0 {
+			return args[0] == "_" || args[0] == "true", nil
+		}
+		return false, nil
+	}
+
+	FalseFunc := func(args ...string) (bool, error) {
+		if len(args) != 0 {
+			return args[0] == "_" || args[0] == "false", nil
+		}
+		return false, nil
+	}
+
+	m, _ := model.NewModelFromFile("examples/rbac_with_temporal_roles_model.conf")
+	e, _ := NewEnforcer(m)
+
+	_, _ = e.AddPolicies([][]string{
+		{"alice", "data1", "read"},
+		{"alice", "data1", "write"},
+		{"data2_admin", "data2", "read"},
+		{"data2_admin", "data2", "write"},
+		{"data3_admin", "data3", "read"},
+		{"data3_admin", "data3", "write"},
+		{"data4_admin", "data4", "read"},
+		{"data4_admin", "data4", "write"},
+		{"data5_admin", "data5", "read"},
+		{"data5_admin", "data5", "write"},
+	})
+
+	_, _ = e.AddGroupingPolicies([][]string{
+		{"alice", "data2_admin", "_", "_"},
+		{"alice", "data3_admin", "_", "_"},
+		{"alice", "data4_admin", "_", "_"},
+		{"alice", "data5_admin", "_", "_"},
+	})
+
+	e.AddNamedLinkConditionFunc("g", "alice", "data2_admin", TrueFunc)
+	e.AddNamedLinkConditionFunc("g", "alice", "data3_admin", TrueFunc)
+	e.AddNamedLinkConditionFunc("g", "alice", "data4_admin", FalseFunc)
+	e.AddNamedLinkConditionFunc("g", "alice", "data5_admin", FalseFunc)
+
+	e.SetNamedLinkConditionFuncParams("g", "alice", "data2_admin", "true")
+	e.SetNamedLinkConditionFuncParams("g", "alice", "data3_admin", "not true")
+	e.SetNamedLinkConditionFuncParams("g", "alice", "data4_admin", "false")
+	e.SetNamedLinkConditionFuncParams("g", "alice", "data5_admin", "not false")
+
+	testEnforce(t, e, "alice", "data1", "read", true)
+	testEnforce(t, e, "alice", "data1", "write", true)
+	testEnforce(t, e, "alice", "data2", "read", true)
+	testEnforce(t, e, "alice", "data2", "write", true)
+	testEnforce(t, e, "alice", "data3", "read", false)
+	testEnforce(t, e, "alice", "data3", "write", false)
+	testEnforce(t, e, "alice", "data4", "read", true)
+	testEnforce(t, e, "alice", "data4", "write", true)
+	testEnforce(t, e, "alice", "data5", "read", false)
+	testEnforce(t, e, "alice", "data5", "write", false)
+
+	m, _ = model.NewModelFromFile("examples/rbac_with_domain_temporal_roles_model.conf")
+	e, _ = NewEnforcer(m)
+
+	_, _ = e.AddPolicies([][]string{
+		{"alice", "domain1", "data1", "read"},
+		{"alice", "domain1", "data1", "write"},
+		{"data2_admin", "domain2", "data2", "read"},
+		{"data2_admin", "domain2", "data2", "write"},
+		{"data3_admin", "domain3", "data3", "read"},
+		{"data3_admin", "domain3", "data3", "write"},
+		{"data4_admin", "domain4", "data4", "read"},
+		{"data4_admin", "domain4", "data4", "write"},
+		{"data5_admin", "domain5", "data5", "read"},
+		{"data5_admin", "domain5", "data5", "write"},
+	})
+
+	_, _ = e.AddGroupingPolicies([][]string{
+		{"alice", "data2_admin", "domain2", "_", "_"},
+		{"alice", "data3_admin", "domain3", "_", "_"},
+		{"alice", "data4_admin", "domain4", "_", "_"},
+		{"alice", "data5_admin", "domain5", "_", "_"},
+	})
+
+	e.AddNamedDomainLinkConditionFunc("g", "alice", "data2_admin", "domain2", TrueFunc)
+	e.AddNamedDomainLinkConditionFunc("g", "alice", "data3_admin", "domain3", TrueFunc)
+	e.AddNamedDomainLinkConditionFunc("g", "alice", "data4_admin", "domain4", FalseFunc)
+	e.AddNamedDomainLinkConditionFunc("g", "alice", "data5_admin", "domain5", FalseFunc)
+
+	e.SetNamedDomainLinkConditionFuncParams("g", "alice", "data2_admin", "domain2", "true")
+	e.SetNamedDomainLinkConditionFuncParams("g", "alice", "data3_admin", "domain3", "not true")
+	e.SetNamedDomainLinkConditionFuncParams("g", "alice", "data4_admin", "domain4", "false")
+	e.SetNamedDomainLinkConditionFuncParams("g", "alice", "data5_admin", "domain5", "not false")
+
+	testDomainEnforce(t, e, "alice", "domain1", "data1", "read", true)
+	testDomainEnforce(t, e, "alice", "domain1", "data1", "write", true)
+	testDomainEnforce(t, e, "alice", "domain2", "data2", "read", true)
+	testDomainEnforce(t, e, "alice", "domain2", "data2", "write", true)
+	testDomainEnforce(t, e, "alice", "domain3", "data3", "read", false)
+	testDomainEnforce(t, e, "alice", "domain3", "data3", "write", false)
+	testDomainEnforce(t, e, "alice", "domain4", "data4", "read", true)
+	testDomainEnforce(t, e, "alice", "domain4", "data4", "write", true)
+	testDomainEnforce(t, e, "alice", "domain5", "data5", "read", false)
+	testDomainEnforce(t, e, "alice", "domain5", "data5", "write", false)
+}
+
+func TestEnforcerWithDefaultDetector(t *testing.T) {
+	// Test that default detector is enabled and detects cycles
+	_, err := NewEnforcer("examples/rbac_model.conf", "examples/rbac_with_cycle_policy.csv")
+
+	// Expect an error because the policy contains a cycle
+	if err == nil {
+		t.Error("Expected cycle detection error when loading policy with cycle, but got nil")
+	} else {
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "cycle detected") {
+			t.Errorf("Expected error message to contain 'cycle detected', got: %s", errMsg)
+		}
+	}
+}
+
+func TestEnforcerRunDetections(t *testing.T) {
+	// Test explicit RunDetections() call
+	e, _ := NewEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv")
+
+	// Should not error on valid policy
+	err := e.RunDetections()
+	if err != nil {
+		t.Errorf("Expected no error when running detections on valid policy, but got: %v", err)
+	}
+
+	// Now add a cycle manually
+	_, _ = e.AddGroupingPolicy("alice", "data2_admin")
+	_, _ = e.AddGroupingPolicy("data2_admin", "super_admin")
+	_, _ = e.AddGroupingPolicy("super_admin", "alice")
+
+	// Should detect the cycle
+	err = e.RunDetections()
+	if err == nil {
+		t.Error("Expected cycle detection error, but got nil")
+	} else {
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "cycle detected") {
+			t.Errorf("Expected error message to contain 'cycle detected', got: %s", errMsg)
+		}
+	}
+}
+
+func TestEnforcerSetDetector(t *testing.T) {
+	// Test SetDetector() method
+	e, _ := NewEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv")
+
+	// Create a custom detector
+	customDetector := detector.NewDefaultDetector()
+	e.SetDetector(customDetector)
+
+	// Should still work with custom detector
+	err := e.RunDetections()
+	if err != nil {
+		t.Errorf("Expected no error with custom detector, but got: %v", err)
+	}
+}
+
+func TestEnforcerSetDetectors(t *testing.T) {
+	// Test SetDetectors() method
+	e, _ := NewEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv")
+
+	// Create multiple detectors
+	detectors := []detector.Detector{
+		detector.NewDefaultDetector(),
+		detector.NewDefaultDetector(),
+	}
+	e.SetDetectors(detectors)
+
+	// Should work with multiple detectors
+	err := e.RunDetections()
+	if err != nil {
+		t.Errorf("Expected no error with multiple detectors, but got: %v", err)
+	}
 }
